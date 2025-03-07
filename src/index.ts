@@ -1,18 +1,29 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 import { v4 as uuid } from 'uuid';
+import dotenv from 'dotenv';
+import axios from 'axios';
+
+dotenv.config();
 
 const typeDefs = `#graphql
 
 enum Genre {
     NONE
+    FANTASY
+    DYSTOPIAN
     FICTION
     ROMANCE
-    FANTASY
-    COMEDY
+    HORROR
+    MYSTERY
+    ADVENTURE
+    SATIRE
+    WAR
+    TRAGEDY
 }
 
 type Author {
+    id: ID!
     name: String!
     nationality: String
 }
@@ -28,12 +39,28 @@ type Book {
 }
 
 type Query {
+    getAuthors: [Author]
+    getAuthor(id: String!): Author
+
     getBooks: [Book]
     getBooksCount: Int!
     getBook(id: String): Book
 }
 
 type Mutation {
+    addAuthor (
+        name: String!
+        nationality: String
+    ): Author
+
+    updateAuthor (
+        id: ID!
+        name: String
+        nationality: String
+    ): Author
+
+    deleteAuthor (id: ID!): Author
+
     addBook (
         title: String!
         description: String
@@ -84,6 +111,25 @@ const books = [
 
 const resolvers = {
     Query: {
+        getAuthors: async () => {
+            try {
+                const { data: authors } = await axios.get(process.env.API_URL + '/authors');
+                console.log('obteniendo authors')
+                return authors;
+            } catch (error) {
+                return null;
+            }
+        },
+        getAuthor: async (root, args) => {
+            try {
+                const { data: author } = await axios.get(process.env.API_URL + '/authors/' + args.id);
+                console.log('obteniendo author con ID: ' + args.id)
+                return author;
+            } catch (error) {
+                return null;
+            }
+        },
+
         getBooks: () => books,
         getBooksCount: () => books.length,
         getBook: (root, args) => {
@@ -102,6 +148,49 @@ const resolvers = {
     },
 
     Mutation: {
+        addAuthor: async (root, args) => {
+            const newAuthor = {
+                name: args.name,
+                nationality: args.nationality
+            }
+            try {
+                const { data: author } = await axios.post(process.env.API_URL + '/authors', newAuthor);
+                console.log('creando author')
+                return author;
+            } catch (error) {
+                return null;
+            }
+        },
+
+        updateAuthor: async (root, args) => {
+            const { data: author } = await axios.get(process.env.API_URL + '/authors/' + args.id);
+
+            const updatedAuthorData = {
+                name: args.name ? args.name : author.name,
+                nationality: args.nationality ? args.nationality : author.nationality,
+            };
+
+            try {
+                const { data: updatedAuthor } = await axios.patch(process.env.API_URL + '/authors/' + args.id, updatedAuthorData);
+                console.log('actualizando author')
+                return updatedAuthor;
+            } catch (error) {
+                return null;
+            }
+        },
+
+        deleteAuthor: async (root, args) => {
+            const { data: author } = await axios.get(process.env.API_URL + '/authors/' + args.id);
+
+            try {
+                const { data: deletedAuthor } = await axios.delete(process.env.API_URL + '/authors/' + args.id);
+                console.log('actualizando author')
+                return author;
+            } catch (error) {
+                return null;
+            }
+        },
+
         addBook: (root, args) => {
             const newBook = { ...args, id: uuid() };
             books.push(newBook);
